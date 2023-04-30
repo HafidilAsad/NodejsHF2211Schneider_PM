@@ -1,0 +1,25 @@
+{
+  "name": "coba-tcp-502",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "nodemon app.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "jsmodbus": "^4.0.6",
+    "modbus-serial": "^8.0.10",
+    "modbus-stream": "^0.46.0",
+    "modbus-tcp": "^0.4.13",
+    "mysql2": "^3.2.0",
+    "net": "^1.0.2",
+    "nodemon": "^2.0.22"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.3"
+  },
+  "description": ""
+}
