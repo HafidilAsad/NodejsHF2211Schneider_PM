@@ -13,23 +13,26 @@ const DB_HOST = "localhost";
 const DB_USER = "root";
 const DB_PASSWORD = "";
 const DB_DATABASE = "monitoring-gas";
-const DB_TABLE = "monitoring_gas30";
-const DB_TABLE2 = "permenit";
-const DB_TABLE3 = "akhir_hari";
+const DB_TABLE = "db_realtime_monitoring_gas";
+const DB_TABLE2 = "db_permenit";
+const DB_TABLE3 = "db_akhir_hari";
 const DB_UPDATE_ID = 1;
 
 async function connectToDatabase() {
   try {
-    const connection = await mysql.createConnection({
+    const pool = await mysql.createPool({
       host: DB_HOST,
       user: DB_USER,
       password: DB_PASSWORD,
       database: DB_DATABASE,
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0,
     });
 
     console.log("Connected to database");
 
-    return connection;
+    return pool;
   } catch (error) {
     console.error(`Error connecting to database: ${error}`);
     process.exit(1);
@@ -37,19 +40,17 @@ async function connectToDatabase() {
 }
 
 async function insertValueIntoDatabaseAkhir(
-  connection,
+  pool,
   nama_mesin,
   gas_used,
   gas_consumption
 ) {
   try {
-    const rounded_gas_used = parseFloat(gas_used.toFixed(1)); // round value to one decimal place
-    // get current timestamp in ISO format
-    const [rows, fields] = await connection.execute(
+    const rounded_gas_used = parseFloat(gas_used.toFixed(1));
+    const [rows, fields] = await pool.execute(
       `INSERT INTO ${DB_TABLE3} (nama_mesin, gas_used, gas_consumption) VALUES (?, ?, ?)`,
       [nama_mesin, rounded_gas_used, gas_consumption]
     );
-
     console.log(`Inserted values into database akhir hari successfully`);
   } catch (error) {
     console.error(`Error inserting values into database akhir hari: ${error}`);
@@ -57,7 +58,7 @@ async function insertValueIntoDatabaseAkhir(
 }
 
 async function insertValueIntoDatabase(
-  connection,
+  pool,
   nama_mesin,
   gas_used,
   gas_consumption
@@ -65,22 +66,22 @@ async function insertValueIntoDatabase(
   try {
     const rounded_gas_used = parseFloat(gas_used.toFixed(1)); // round value to one decimal place
     // get current timestamp in ISO format
-    const [rows, fields] = await connection.execute(
+    const [rows, fields] = await pool.execute(
       `INSERT INTO ${DB_TABLE2} (nama_mesin, gas_used, gas_consumption) VALUES (?, ?, ?)`,
       [nama_mesin, rounded_gas_used, gas_consumption]
     );
 
-    console.log(`Inserted values into database successfully`);
+    // console.log(`Inserted values into database successfully`);
   } catch (error) {
     console.error(`Error inserting values into database: ${error}`);
   }
 }
 
-async function updateValueInDatabase(connection, value, column) {
+async function updateValueInDatabase(pool, value, column) {
   try {
     const roundedValue = parseFloat(value.toFixed(1)); // round value to one decimal place
     const timestamp = new Date().toISOString(); // get current timestamp in ISO format
-    const [rows, fields] = await connection.execute(
+    const [rows, fields] = await pool.execute(
       `UPDATE ${DB_TABLE} SET ${column} = ?, timestamp = ? WHERE id = ?`,
       [roundedValue, timestamp, DB_UPDATE_ID]
     );
@@ -98,19 +99,20 @@ client.connectTCP(HOST, { port: PORT }).then(() => {
   client.setID(SLAVE_ID);
 
   // Connect to the database
-  connectToDatabase().then((connection) => {
+  connectToDatabase().then((pool) => {
     // Read the Modbus values every second
     setInterval(() => {
       client.readHoldingRegisters(ADDRESS_1, 2, function (err, data) {
         if (err) {
           console.error(`Error reading data gas_used: ${err}`);
+          process.exit(1);
         } else {
           // Combine the two registers into a single 32-bit value
           const buffer = Buffer.from(data.buffer);
           const value = buffer.readFloatBE();
 
           // Update the value in the database
-          updateValueInDatabase(connection, value, "gas_used");
+          updateValueInDatabase(pool, value, "gas_used");
         }
       });
 
@@ -123,7 +125,7 @@ client.connectTCP(HOST, { port: PORT }).then(() => {
           const value = buffer.readUInt32BE();
 
           // Update the value in the database
-          updateValueInDatabase(connection, value, "gas_consumption");
+          updateValueInDatabase(pool, value, "gas_consumption");
         }
       });
     }, 500);
@@ -147,24 +149,20 @@ client.connectTCP(HOST, { port: PORT }).then(() => {
               const buffer = Buffer.from(data.buffer);
               const gas_consumption = buffer.readUInt32BE();
 
-              // Insert the values into the database
-              insertValueIntoDatabase(
-                connection,
-                "striko1",
-                gas_used,
-                gas_consumption
-              );
+              // Insert the values into the database if gas_consumption is greater than 0
+              if (gas_consumption > 0) {
+                insertValueIntoDatabase(
+                  pool,
+                  "striko1",
+                  gas_used,
+                  gas_consumption
+                );
+              }
             }
           });
         }
       });
     }, 60000);
-
-    //Insert data pas akhir=========================================================
-
-    // 86400000
-
-    // =======================================================
   });
 });
 
@@ -175,7 +173,7 @@ client
     client.setID(SLAVE_ID);
 
     // Connect to the database
-    connectToDatabase().then((connection) => {
+    connectToDatabase().then((pool) => {
       setInterval(() => {
         client.readHoldingRegisters(ADDRESS_1, 2, function (err, data) {
           if (err) {
@@ -200,18 +198,18 @@ client
                 let valueInserted = false;
 
                 if (
-                  hour === 15 &&
-                  minute === 30 &&
+                  hour === 08 &&
+                  minute === 27 &&
                   second === 0 &&
                   !valueInserted
                 ) {
                   insertValueIntoDatabaseAkhir(
-                    connection,
+                    pool,
                     "Striko 1",
                     gas_used,
                     gas_consumption
                   );
-                } else if (hour !== 15 || minute !== 30 || second !== 5) {
+                } else if (hour !== 08 || minute !== 27 || second !== 59) {
                   valueInserted = false;
                 }
               }
@@ -224,4 +222,5 @@ client
 
   .catch((error) => {
     console.error(`Error connecting to Modbus TCP server: ${error}`);
+    process.exit(1);
   });

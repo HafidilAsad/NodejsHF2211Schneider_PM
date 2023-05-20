@@ -47,31 +47,23 @@ async function updateValueInDatabase(connection, value) {
 client
   .connectTCP(HOST, { port: PORT })
   .then(() => {
-    // Set the slave ID to 1
     client.setID(SLAVE_ID);
-
-    // Connect to the database
     connectToDatabase().then((connection) => {
-      // Read the Modbus value every second
       setInterval(() => {
         client.readHoldingRegisters(ADDRESS, 2, function (err, data) {
           if (err) {
             console.error(`Error reading data: ${err}`);
+            process.exit(1);
           } else {
-            // Combine the two registers into a single 32-bit value
             const buffer = Buffer.from(data.buffer);
             const value = buffer.readFloatBE();
-
-            // jika mau make int
-            //const intValue = Math.round(value);
-
-            // Update the value in the database
             updateValueInDatabase(connection, value);
           }
         });
-      }, 500);
+      }, 1000);
     });
   })
   .catch((error) => {
     console.error(`Error connecting to Modbus TCP server: ${error}`);
+    process.exit(1);
   });
