@@ -11,12 +11,14 @@
   "license": "ISC",
   "dependencies": {
     "jsmodbus": "^4.0.6",
+    "long": "^5.2.3",
     "modbus-serial": "^8.0.10",
     "modbus-stream": "^0.46.0",
     "modbus-tcp": "^0.4.13",
     "mysql2": "^3.2.0",
     "net": "^1.0.2",
-    "nodemon": "^2.0.22"
+    "nodemon": "^2.0.22",
+    "readuint64be": "^1.0.5"
   },
   "devDependencies": {
     "typescript": "^5.0.3"
